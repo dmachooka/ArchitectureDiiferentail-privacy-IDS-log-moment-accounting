@@ -1,0 +1,370 @@
+# Reproducible PATE Privacy Accounting for IoT Intrusion Detection
+
+## Abstract
+This notebook presents a rigorous and reproducible reference implementation of the legacy Laplace Report NoisyMax PATE (Private Aggregation of Teacher Ensembles) accounting mechanism for tabular IoT intrusion detection. The experiment explores various teacher and student architectural configurations and performs a sensitivity analysis on the number of teachers, evaluating their impact on privacy guarantees (data-dependent and data-independent epsilon) and student model accuracy.
+
+## 1. Introduction
+This document serves as a guide to replicate the PATE privacy accounting experiment, ensuring methodological rigor and transparency for academic scrutiny, particularly for submissions to journals like Springer. It details the experimental setup, data handling, model training, privacy accounting, and result analysis steps.
+
+## 2. Setup Requirements
+
+### 2.1. Environmental Setup and Dependencies
+This experiment is designed to run in a controlled environment, leveraging its GPU capabilities for accelerated training. 
+
+**Software Dependencies:**
+*   Python (version used, typically 3.14)
+*  ## Running the Experiment Locally
+
+To replicate the experiment on your local machine, follow these steps:
+
+### 1. Prerequisites
+
+Ensure you have Python installed on your system (version 3.8+ is recommended, consistent with typical Colab environments). You can download Python from [python.org](https://www.python.org/downloads/).
+
+### 2. Environment Setup
+
+It is highly recommended to use a virtual environment to manage dependencies for your project. This prevents conflicts with other Python projects on your system.
+
+1.  **Create a virtual environment** (e.g., named `pate_env`):
+
+    ```bash
+    python -m venv pate_env
+    ```
+
+2.  **Activate the virtual environment**:
+
+    *   On macOS/Linux:
+
+        ```bash
+        source pate_env/bin/activate
+        ```
+
+    *   On Windows:
+
+        ```bash
+        .\pate_env\Scripts\activate
+        ```
+
+3.  **Install dependencies**: With your virtual environment activated, install all required libraries using the `requirements.txt` file:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### 3. Data Setup
+
+1.  **Download the `RT_IOT2022,botnet,IOT,MQTT,RT_IoT.csv` datasets** from its source (as mentioned in the README, you'll need to locate the original source for download, e.g., a UCI repository link).
+2.  **Place the `RT_IOT2022,botnet,IoT,MQTT,RT_IoT.csv` files** in a directory accessible by your local environment. A common practice is to create a `data` folder within your project directory and place the CSV there.
+3.  **Update the `DATA_PATH` variable** in the notebook (e.g., in the `G3d_OTe7_ahc` cell) to point to the local path of your `RT_IOT2022.csv` file (e.g., `DATA_PATH = './data/RT_IOT2022.csv'`).
+
+### 4. Run the Notebook
+
+1.  **Install Jupyter Notebook or JupyterLab** (if you don't have it already) within your activated virtual environment:
+
+    ```bash
+    pip install jupyter
+    ```
+
+2.  **Launch Jupyter Notebook/Lab** from your project directory:
+
+    ```bash
+    jupyter notebook
+    ```
+
+3.  Open the `[Your Notebook Name].ipynb` file (this Colab notebook) in your browser.
+4.  **Execute cells sequentially** from top to bottom. Remember to adjust `DATA_PATH` as mentioned above.
+1. Prerequisites
+Ensure you have Python installed on your system (version 3.8+ is recommended, consistent with typical Colab environments). You can download Python from python.org.
+
+2. Environment Setup
+It is highly recommended to use a virtual environment to manage dependencies for your project. This prevents conflicts with other Python projects on your system.
+
+Create a virtual environment (e.g., named pate_env):
+
+python -m venv pate_env
+Activate the virtual environment:
+
+On macOS/Linux:
+
+source pate_env/bin/activate
+On Windows:
+
+.\pate_env\Scripts\activate
+Install dependencies: With your virtual environment activated, install all required libraries using the requirements.txt file:
+
+pip install -r requirements.txt
+3. Data Setup
+Download the RT_IOT2022.csv dataset from its source (as mentioned in the README, you'll need to locate the original source for download, e.g., a UCI repository link).
+Place the RT_IOT2022.csv file in a directory accessible by your local environment. A common practice is to create a data folder within your project directory and place the CSV there.
+Update the DATA_PATH variable in the notebook (e.g., in the G3d_OTe7_ahc cell) to point to the local path of your RT_IOT2022.csv file (e.g., DATA_PATH = './data/RT_IOT2022.csv').
+4. Run the Notebook
+Install Jupyter Notebook or JupyterLab (if you don't have it already) within your activated virtual environment:
+
+pip install jupyter
+Launch Jupyter Notebook/Lab from your project directory:
+
+jupyter notebook
+Open the [Your Notebook Name].ipynb file (this  notebook) in your browser.
+
+Execute cells sequentially from top to bottom. Remember to adjust DATA_PATH as mentioned above.
+
+%%writefile verify_deps.py
+import os
+import math
+import random
+import warnings
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader, Subset
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from imblearn.over_sampling import RandomOverSampler
+
+print("All specified libraries imported successfully!")
+ensure all these requirements are met
+absl-py==1.4.0
+accelerate==1.14.0
+access==1.1.10.post3
+affine==3.0.1
+aiofiles==25.1.0
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiosignal==1.4.0
+aiosqlite==0.22.1
+alabaster==1.0.0
+albucore==0.0.24
+albumentations==2.0.8
+ale-py==0.12.1
+altair==5.5.0
+annotated-doc==0.0.5
+annotated-types==0.8.0
+antlr4-python3-runtime==4.9.3
+anyio==4.14.2
+anywidget==0.9.21
+apsw==3.53.4.0
+argon2-cffi==25.1.0
+argon2-cffi-bindings==26.1.0
+array_record==0.8.3
+arrow==1.4.0
+arviz==0.22.0
+astropy==7.2.2
+astropy-iers-data==0.2026.8.31.0.57.9
+astunparse==1.6.3
+atpublic==5.1
+attrs==26.1.0
+audioop-lts==0.2.2
+audioread==3.1.0
+Authlib==1.8.0
+autograd==1.9.1
+babel==2.18.0
+backcall==0.2.0
+beartype==0.22.9
+beautifulsoup4==4.13.5
+betterproto==2.0.0b7
+bigframes==2.48.0
+bigquery-magics==0.14.0
+bleach==6.4.0
+blinker==1.9.0
+blis==1.3.3
+blobfile==3.3.0
+blosc2==4.12.0
+bokeh==3.8.2
+Bottleneck==1.4.2
+bqplot==0.12.47
+branca==0.8.2
+brotli==1.2.0
+CacheControl==0.14.4
+cachetools==6.2.6
+catalogue==2.0.10
+certifi==2026.7.22
+cffi==2.1.1
+chardet==5.2.0
+charset-normalizer==3.4.9
+clarabel==0.11.1
+click==8.5.0
+cligj==0.7.2
+cloudpathlib==0.25.0
+cloudpickle==3.1.2
+cmake==3.31.10
+cmdstanpy==1.3.0
+colorcet==3.2.1
+colorlover==0.3.0
+community==1.0.0b1
+confection==1.3.3
+cons==0.4.7
+contourpy==1.3.3
+cramjam==2.12.1
+cryptography==50.0.1
+cucim-cu12 @ https://pypi.nvidia.com/cucim-cu12/cucim_cu12-26.2.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+cuda-bindings==12.9.7
+cuda-core==0.3.2
+cuda-pathfinder==1.8.0
+cuda-python==12.9.7
+cuda-toolkit==12.8.1
+cudf-cu12==26.2.1
+cudf-polars-cu12==26.2.1
+cufflinks==0.17.3
+cuml-cu12==26.2.0
+cupy-cuda12x==14.0.1
+curl_cffi==0.16.2
+cuvs-cu12 @ https://pypi.nvidia.com/cuvs-cu12/cuvs_cu12-26.2.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
+cvxopt==1.3.2
+cvxpy==1.6.7
+cycler==0.12.1
+cyipopt==1.5.0
+cymem==2.0.13
+Cython==3.0.12
+dask==2026.1.1
+dask-cuda==26.2.0
+dask-cudf-cu12==26.2.1
+dataproc-spark-connect==1.1.0
+datasets==4.8.5
+db-dtypes==1.7.1
+dbus-python==1.3.2
+debugpy==1.8.15
+decorator==4.4.2
+defusedxml==0.7.1
+deprecation==2.1.0
+diffusers==0.40.0
+dill==0.4.1
+distributed==2026.1.1
+distributed-ucxx-cu12==0.48.0
+starlette==1.6.0
+statsmodels==0.15.0
+strictyaml==1.7.3
+stringzilla==5.1.2
+stumpy==1.14.1
+sympy==1.14.0
+tables==3.10.2
+tabulate==0.9.0
+tbb==2022.3.1
+tblib==3.2.2
+tcmlib==1.5.0
+tenacity==9.1.4
+tensorboard==2.20.0
+tensorboard-data-server==0.7.2
+tensorflow==2.20.0
+tensorflow-datasets==4.9.10
+tensorflow-hub==0.16.1
+tensorflow-metadata==1.21.0
+tensorflow-probability==0.25.0
+tensorflow-text==2.20.1
+tensorstore==0.1.85
+termcolor==3.3.0
+terminado==0.18.1
+text-unidecode==1.3
+textblob==0.19.0
+tf-slim==1.1.0
+tf_keras==2.20.1
+thinc==8.3.13
+threadpoolctl==3.6.0
+tifffile==2026.8.23
+tiktoken==0.14.0
+timm==1.0.29
+tinycss2==1.5.1
+tobler==0.14.0
+tokenizers==0.23.1
+toml==0.10.2
+tomlkit==0.14.0
+toolz==0.12.1
+torch==2.11.0+cu128
+torchao==0.10.0
+torchaudio==2.11.0+cu128
+torchcodec==0.11.0+cu128
+torchdata==0.11.0
+torchsummary==1.5.1
+torchtune==0.6.1
+torchvision==0.26.0+cu128
+tornado==6.5.7
+tqdm==4.67.3
+traitlets==5.7.1
+traittypes==0.2.3
+transformers==5.16.1
+treelite==4.7.1
+treescope==0.1.10
+triton==3.6.0
+truststore==0.10.4
+tsfresh==0.21.2
+tweepy==4.17.0
+typeguard==4.6.0
+typer==0.27.2
+types-pytz==2026.3.1.20260727
+types-setuptools==84.0.0.20260812
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+tzdata==2026.3
+tzlocal==5.4.4
+ucxx-cu12==0.48.0
+umap-learn==0.5.12
+umf==1.0.3
+uri-template==1.3.0
+uritemplate==4.2.0
+urllib3==2.5.0
+uuid_utils==0.17.0
+uvicorn==0.52.4
+uvloop==0.22.1
+vega-datasets==0.9.0
+wadllib==1.3.6
+wandb==0.28.1
+wasabi==1.1.3
+watchdog==6.0.0
+watchfiles==1.2.0
+wcwidth==0.8.3
+weasel==1.0.0
+webcolors==25.10.0
+webencodings==0.6.1
+websocket-client==1.9.2
+websockets==15.0.1
+Werkzeug==3.1.8
+wheel==0.48.0
+widgetsnbextension==3.6.10
+wordcloud==1.9.6
+wrapt==2.4.0
+xarray==2025.12.0
+xarray-einstats==0.11.0
+xgboost==3.4.1
+xlrd==2.0.2
+xxhash==4.0.1
+xyzservices==2026.3.0
+yarl==1.24.5
+ydf==0.15.0
+ydf_tf==2.20.0
+yellowbrick==1.5
+yfinance==0.2.66
+zict==3.0.0
+zipp==4.1.0
+zstandard==0.25.0
+ this script verifies you have all libraries and dependencies installed
+ 
+print("Verifying core library imports...")
+
+core_libraries = [
+    "os", "copy", "math", "random", "time", "warnings",
+    "numpy", "pandas", "torch", "torch.nn", "torch.nn.functional",
+    "torch.optim", "torch.utils.data", "sklearn.model_selection",
+    "sklearn.preprocessing", "sklearn.metrics", "imblearn.over_sampling"
+]
+
+for lib in core_libraries:
+    try:
+        # Special handling for sub-modules if directly specified
+        if '.' in lib:
+            module_name, sub_module = lib.split('.', 1)
+            __import__(module_name)
+            getattr(globals()[module_name], sub_module)
+        else:
+            __import__(lib)
+        print(f"✅ Successfully imported {lib}")
+    except ImportError:
+        print(f"❌ Failed to import {lib}. Please ensure it is installed (`pip install {lib.split('.')[0]}`)")
+    except AttributeError:
+        print(f"❌ Failed to access submodule {sub_module} from {module_name}. Please check the installation.")
+    except Exception as e:
+        print(f"⚠️ An unexpected error occurred while importing {lib}: {e}")
+
+print("\nImport verification complete.")
